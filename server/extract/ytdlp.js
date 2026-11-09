@@ -141,7 +141,7 @@ const YTDLP_ERROR_PATTERNS = [
   { code: CODES.COOKIES_EXPIRED,     test: /use --cookies-from-browser or --cookies for the authentication/i },
 ];
 
-function classifyYtdlpStderr(stderr) {
+export function classifyYtdlpStderr(stderr) {
   const text = stderr || '';
   const scan = (s) => YTDLP_ERROR_PATTERNS.find(({ test }) => test.test(s))?.code ?? null;
   // What actually terminated the run is on an `ERROR:` line. Stray WARNING

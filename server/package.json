@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node --watch index.js",
     "start": "node index.js",
+    "test": "node --test",
     "service:stop": "launchctl unload ~/Library/LaunchAgents/com.cookbook.server.plist",
     "service:start": "launchctl load ~/Library/LaunchAgents/com.cookbook.server.plist",
     "service:restart": "launchctl kickstart -k gui/$(id -u)/com.cookbook.server",

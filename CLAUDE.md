@@ -19,6 +19,7 @@ follows the "Pantry" design prototype (`design/Pantry.dc.html`, mapped in `docs/
 - Frontend framework: React + Vite, built as a **PWA** (web manifest + service worker)
 - Styling: **Plain hand-written CSS** (no framework). Onest font; terracotta `#c56a4a`
   accent and the palette in `docs/design.md`.
+- Prerequisites: **yt-dlp** and **ffmpeg** on `PATH` (ffmpeg grabs cover/step frames — `server/extract/frame.js`).
 - Hosting target: **home machine + private tunnel (Tailscale)** — only my own devices reach
   it, so no in-app auth. The backend runs yt-dlp from a residential IP for reliability.
 
@@ -35,7 +36,9 @@ follows the "Pantry" design prototype (`design/Pantry.dc.html`, mapped in `docs/
 - **Monorepo:** `server/` (API) and `client/` (React PWA).
 - **Recipe fields** (match the design + specs exactly, don't invent): `title`, `description`,
   `cuisine`, `category`, `minutes` (total time), `servings`, `rating`, `favorite`, `image`,
-  `ingredients`, `steps`, `source_url`, `source_caption`.
+  `ingredients`, `steps`, `source_url`, `source_caption`; also `protein`, `carb` (string arrays),
+  `tags`, `filters` (string arrays), `step_times` (seconds, parallel to `steps`) and read-only
+  `has_video` (the DB's `video_file` is internal; the API exposes only `has_video`).
   - `ingredients` are **`{name, qty}` objects**; `steps` are ordered step text.
   - **All measurements are stored and displayed in imperial.** The AI extraction must convert any
     metric units to imperial — weights in oz/lb, volumes in cups/tbsp/tsp/fl oz, oven temps in °F,
@@ -56,13 +59,19 @@ follows the "Pantry" design prototype (`design/Pantry.dc.html`, mapped in `docs/
 - API / endpoint docs: `docs/api.md`
 - Normalized data shapes: `docs/data-shapes.md`
 - Decisions log: `docs/decisions.md`
+- Extraction pipeline (yt-dlp + Gemini + ffmpeg frames): `server/extract/`
+- One-off scripts (e.g. `backfill-videos.mjs`): `server/scripts/`
+- LaunchAgent plists for the always-on server/build: `deploy/`
+- Original build plan (historical): `docs/original-build-plan.md`
 - Design reference: `design/` (pulled prototype) + `docs/design.md` (screen-by-screen mapping)
 
 ## Commands
 - Install: `cd server && npm install` &nbsp;and&nbsp; `cd client && npm install`
 - Run dev: `cd server && npm run dev` (API on :3001) &nbsp;and&nbsp; `cd client && npm run dev` (:5173)
-- Test: **manual QA** — run the app and verify against the spec; there is no automated runner yet
-- Build: `cd client && npm run build`
+- Test: `cd server && npm test` (`node --test`, unit tests in `server/test/`; CI in `.github/workflows/tests.yml`). UI is still manual QA against the spec
+- Build: `cd client && npm run build` (runs `node scripts/build.mjs`, a stage-and-swap of `client/dist`)
+- Service (macOS LaunchAgents in `deploy/`): `npm run service:{start,stop,restart,log}` in `server/`
+  (`com.cookbook.server`, log `cookbook.log`) and in `client/` (`com.cookbook.build`, log `build.log`)
 
 ---
 
@@ -160,3 +169,21 @@ next step, so future sessions and fresh-context agents stay consistent.
 Surface for the user to confirm (do not let an agent do these unprompted): deploying to
 production, deleting data, changing access or security settings, creating accounts, or
 entering any credentials.
+
+### Close out: update the docs before you finish
+
+A run is not done until the written record matches what was built. **As the last step of every
+run** — Mode A or B, after the `qa-agent` gate and before your final summary — you (the orchestrator,
+not a subagent) update the docs, because you are the only one who saw the whole run:
+
+1. **This file (`CLAUDE.md`).** Edit only what the run made stale: new or changed commands (install/dev/test/build),
+   new conventions or patterns the team adopted, new folders or files under "Where things live",
+   changes to the tech stack or data sources. Replace any `<placeholder>` the run answered. Keep it a brief, not a
+   changelog — no per-feature history here; that belongs in `docs/decisions.md`. Never touch the
+   `## Orchestration` section or the team marker line unless the user asks.
+2. **The living docs.** Confirm `docs/api.md`, `docs/data-shapes.md`, the relevant `specs/<feature>.md`, and (if present) `docs/design.md` match the code as it now stands — fix field/column names,
+   shapes, or paths that drifted during the build. Append any decisions not yet logged to
+   `docs/decisions.md`.
+3. **Report it.** In the close-out summary, list which docs you changed (or say "docs already
+   current"). If a run was abandoned or failed the gate, still log what was learned in
+   `docs/decisions.md`, but don't document unbuilt behavior as if it exists.

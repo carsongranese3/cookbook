@@ -5,6 +5,10 @@ Raw file: [`design/Pantry.dc.html`](../design/Pantry.dc.html) — a `.dc.html` c
 (uses `sc-for`/`sc-if`/`{{ }}` placeholder bindings; it is a **visual spec, not runnable code**).
 Both a **Desktop** and a **Phone** frame are drawn for every screen.
 
+> **As built (differs from the mapping below):** Cooking Mode plays the recipe's source video beside the steps
+> (stacked above the step on phones) and seeks it to each step's timestamp — `client/src/screens/CookingMode.jsx`.
+> YouTube is not supported; sources are Instagram + TikTok only (see `docs/decisions.md`).
+
 ## Visual system
 - **Font:** Onest (Google Fonts), weights 400–700. `system-ui` fallback.
 - **Palette:**
@@ -25,6 +29,7 @@ Both a **Desktop** and a **Phone** frame are drawn for every screen.
 1. **Library (home)** — eyebrow "My Kitchen", title "Recipes", search box (recipes + ingredients), category/cuisine filter chips, recipe card grid (3-col desktop / 2-col phone). Card = image + favorite heart overlay, title, `X min · cuisine · ★ rating`. Empty state: "No recipes match ‘…’".
 2. **Recipe Detail** — back link, hero image, eyebrow `cuisine · category`, title, description, stats (Total time / Servings / Rating). Actions: **Start cooking** (black), **Add to list**, **Add to plan**, **Favorite**. Two columns: **Ingredients** (name + qty rows) and **Method** (numbered steps).
 3. **AI Import — "Add from a video"** — eyebrow "AI Import" (terracotta), URL input (link icon), **Extract** button, sample-link chips. States: **loading** ("Watching the video…" spinner + status line), **error** (terracotta banner), **AI draft** (hero with "AI draft" badge, editable title, description, meta, ingredients, method) → **Save to library** / **Discard**. Copy names **TikTok, Instagram, and YouTube**.
+   - *As built:* before extracting, the pasted link is checked client-side against the `source_url`s already loaded (`client/src/utils/videoUrlKey.js`: ignores query/hash, `www.`, trailing slash; keys `ig:<shortcode>` / `tt:<id>` / `ttshort:<token>`; TikTok short links are not resolved to canonical ones). A match opens `DuplicateVideoModal` ("Already imported") with the existing recipe, a **View recipe** link, **Cancel**, and **Import again**.
 4. **Meal Plan** — eyebrow "This week", 7-day grid (desktop) / vertical day list (phone). Each day: name, date, meal thumbnails, "+ Add meal". A **plan-picker modal** chooses a recipe for a day.
 5. **Shopping List** — eyebrow "N to buy", add-item input, "Clear checked". Item rows: checkbox, name (strikethrough when checked), qty. Empty state.
 6. **Cooking Mode** — full-screen dark overlay. Header (title + close), progress bar, "Step N of total" (terracotta), large centered step text, footer Back / dots / **Next**→**Finish**. Note: this design's Cook Mode is **step text only — no video pane**.

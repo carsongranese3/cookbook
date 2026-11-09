@@ -18,7 +18,7 @@ CORS: open (single-user private deployment)
 5. [Shopping List](#5-shopping-list)
 6. [History](#6-history)
 7. [Pantry](#7-pantry)
-8. [AI Extract](#8-ai-extract)
+8. [AI Extract](#8-ai-extract) (includes `POST /api/extract-and-save`)
 9. [Common error shape](#9-common-error-shape)
 
 ---
@@ -49,6 +49,8 @@ All recipe responses share the same full recipe object shape (see below).
   "description":    "string (one-sentence blurb; may be empty)",
   "cuisine":        "string (e.g. 'Italian'; free text)",
   "category":       "string ('Dinner' | 'Breakfast' | 'Dessert' | free text)",
+  "protein":        ["chicken"],
+  "carb":           ["rice"],
   "minutes":        25,
   "servings":       4,
   "rating":         4.8,
@@ -68,6 +70,7 @@ All recipe responses share the same full recipe object shape (see below).
 ```
 
 Field notes:
+- `protein` / `carb` — arrays of strings: the dish's main protein(s) / carb(s); `[]` if none. Accepted on `POST`/`PUT`.
 - `minutes` and `servings` are integers or `null`.
 - `rating` is a float or `null`; `null` renders as "New" in the UI.
 - `favorite` is a boolean.
@@ -1610,6 +1613,24 @@ The server saves the upload to a temp file, calls Gemini, then deletes the temp 
 - `400` — no file attached.
 - `422` — video processed but no recipe found, or unparseable Gemini output.
 - `503` — server not configured (set `GEMINI_API_KEY` in `server/.env`).
+
+---
+
+### `POST /api/extract-and-save`
+
+**One-shot extract + save.** Extracts a recipe from an Instagram/TikTok URL and immediately persists it, with no review step. Used by the iOS "Add to Cookbook" share Shortcut. The regular two-step flow (`POST /api/extract` then `POST /api/recipes`) is unchanged.
+
+**Request body:**
+```json
+{ "url": "https://www.tiktok.com/@chef/video/123" }
+```
+
+**Response 201** — the created recipe object (§2). `source_url` is set to the submitted `url`; an empty extracted title is saved as `"Imported recipe"`; the downloaded video is claimed automatically (`has_video: true` when the stash succeeded).
+
+**Error responses** — same extract error object and status mapping as `POST /api/extract`:
+- `400` — `url` missing (`UNSUPPORTED_URL`) or not Instagram/TikTok.
+- `503` — extract module failed to load (`EXTRACT_UNAVAILABLE`), or `CONFIG` / `COOKIES_EXPIRED` / `DOWNLOADER_MISSING`.
+- Other codes (`403`, `404`, `422`, `429`, `502`, `504`) per the table above; `500` for an unexpected error.
 
 ---
 

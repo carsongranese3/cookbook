@@ -18,7 +18,7 @@ import {
   createReadStream,
 } from 'node:fs';
 import db from './db.js';
-import { toStoreQuantity, parseRequired, computeBuyAmount, isBumpable, isBareCount } from './storeQty.js';
+import { toStoreQuantity, parseRequired, computeBuyAmount, isBumpable, scaleReceiptObservation } from './storeQty.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -1310,63 +1310,6 @@ const receiptLookupStmt = db.prepare(`
  */
 function lookupReceiptPrice(normStore, normZip, nameKey) {
   return receiptLookupStmt.get(normStore, normZip, nameKey) ?? null;
-}
-
-// Dimensions parseRequired() can hand back that represent a genuine
-// continuous/per-unit measure worth scaling. 'count' is included but is
-// ambiguous on its own — see the isBareCount check inside
-// scaleReceiptObservation below — because parseRequired() also returns
-// 'count' as its fallback for any quantity with no recognized unit at all,
-// which includes container words like "1 bag" or "1 jar". Weight, volume,
-// and clove amounts are unambiguous continuous/physical measures and always
-// scale safely; a bare count ("12", "6") is equally safe, but a container
-// count ("1 bag") is not, so 'count' needs the extra bare-count test.
-const RECEIPT_SCALABLE_DIMS = new Set(['weight', 'volume', 'clove', 'count']);
-
-/**
- * Price a shopping-list item's requested qty against a receipt observation,
- * scaling when the dimensions match and both quantities parse to a usable
- * amount; otherwise falling back to the observed price as a whole.
- *
- * The final scaled price is ROUNDED to the cent — the same
- * `Math.round(n * 100) / 100` convention `coercePrice` (extract/price.js)
- * already uses for every other price in this app. (No epsilon guard is
- * needed: verified that an exact-quantity match — receipt qty === list qty —
- * reproduces the observed total to the cent under plain rounding.)
- *
- * @param {object} obs  A receipt_prices row (base_amount, dim, unit_price, total_price, qty_text).
- * @param {string} listQtyText  The shopping-list row's own `qty` string.
- * @returns {{ price: number, qty_priced: string|null }}
- *   qty_priced is null when the full requested qty was priced exactly
- *   (scaled); it is the receipt's own qty string when falling back, so the
- *   UI can render "priced as …".
- */
-function scaleReceiptObservation(obs, listQtyText) {
-  const listQty = String(listQtyText ?? '').trim();
-  const listParsed = parseRequired(listQty);
-
-  let canScale =
-    RECEIPT_SCALABLE_DIMS.has(obs.dim) &&
-    obs.dim === listParsed.dim &&
-    obs.base_amount > 0 &&
-    listParsed.base > 0 &&
-    typeof obs.unit_price === 'number';
-
-  // 'count' is ambiguous (see the RECEIPT_SCALABLE_DIMS comment above): only
-  // scale it when BOTH sides are a bare numeric count with no unit word at
-  // all ("12", "6") — a container noun on either side ("1 bag", "2 jars")
-  // falls through to the unscalable branch below instead.
-  if (canScale && obs.dim === 'count') {
-    canScale = isBareCount(obs.qty_text) && isBareCount(listQty);
-  }
-
-  if (canScale) {
-    const raw = obs.unit_price * listParsed.base;
-    const price = Math.round(raw * 100) / 100;
-    return { price, qty_priced: null };
-  }
-
-  return { price: obs.total_price, qty_priced: obs.qty_text || null };
 }
 
 /**

@@ -60,8 +60,8 @@ Field rules:
 
 ## 2. Persisted recipe (DB + API response)
 
-Stored in the `recipes` SQLite table. JSON columns (`ingredients`, `steps`,
-`tags`) are serialized with `JSON.stringify` / parsed with `JSON.parse` by
+Stored in the `recipes` SQLite table. JSON columns (`protein`, `carb`, `ingredients`, `steps`,
+`step_times`, `tags`, `filters`) are serialized with `JSON.stringify` / parsed with `JSON.parse` by
 the backend. All measurements are **imperial** — no metric values are stored.
 
 | Field            | JS type              | SQLite column type | Notes |
@@ -71,12 +71,15 @@ the backend. All measurements are **imperial** — no metric values are stored.
 | `description`    | `string`             | `TEXT`             | One-sentence blurb; empty string default. |
 | `cuisine`        | `string`             | `TEXT`             | Free text; e.g. "Italian". |
 | `category`       | `string`             | `TEXT`             | Free text; chip-mapped values: "Dinner", "Breakfast", "Dessert". |
+| `protein`        | `string[]`           | `TEXT` (JSON)      | Main protein(s) of the dish; default `[]`. |
+| `carb`           | `string[]`           | `TEXT` (JSON)      | Main carb(s) of the dish; default `[]`. |
 | `minutes`        | `integer`            | `INTEGER`          | Total cook time in minutes. |
 | `servings`       | `integer`            | `INTEGER`          | Number of servings. |
 | `rating`         | `number \| null`     | `REAL`             | e.g. `4.8`; `null` renders as "New" in the UI. |
 | `favorite`       | `boolean`            | `INTEGER` (0/1)    | Default `false` / `0`. |
 | `image`          | `string \| null`     | `TEXT`             | URL or data string; `null` → UI shows placeholder gradient. |
 | `tags`           | `string[]`           | `TEXT` (JSON)      | e.g. `["Vegetarian"]`. "Vegetarian" chip matches tag case-insensitively. Default `[]`. |
+| `filters`        | `string[]`           | `TEXT` (JSON)      | Assigned user filter labels (from the `filters` table); default `[]`. |
 | `ingredients`    | `{name,qty}[]`       | `TEXT` (JSON)      | See ingredient shape below. Order preserved. |
 | `steps`          | `string[]`           | `TEXT` (JSON)      | Ordered step text. |
 | `step_times`     | `number[]`           | `TEXT` (JSON)      | Seconds, positionally parallel to `steps`. May be `[]` or shorter than `steps`. Drives Cook Mode's video seek. |
@@ -85,6 +88,14 @@ the backend. All measurements are **imperial** — no metric values are stored.
 | `video_file`     | `string \| null`     | `TEXT`             | Bare filename in `server/media/` (e.g. `<id>.mp4`), NOT a path; `null` if no video. **Internal only — never returned by the API.** The API exposes a derived `has_video: boolean` instead (see `GET /api/recipes/:id/video`). |
 | `created_at`     | `string` (ISO 8601)  | `TEXT NOT NULL`    | Set once at creation; never updated. |
 | `updated_at`     | `string` (ISO 8601)  | `TEXT NOT NULL`    | Updated on every PUT. |
+
+### Other tables (shapes map 1:1 to the `docs/api.md` objects)
+
+Defined in `server/db.js`; see the matching `docs/api.md` section for the API object.
+
+- `filters` — `id`, `label`, `position` (INTEGER), `created_at`. User-managed filter labels (api.md §3).
+- `history` — `id`, `recipe_id` (no foreign key: entries survive recipe deletion; API renders `recipe: null`), `date`, `rating` (INTEGER), `image`, `description`, `created_at`, `updated_at` (api.md §6).
+- `pantry` — `id`, `name`, `qty` (TEXT), `category` (default `Other`), `position` (INTEGER), `created_at`, `updated_at` (api.md §7).
 
 ### Ingredient item shape (used in both draft and persisted recipe)
 
@@ -598,8 +609,10 @@ These live in `server/.env` (gitignored). Backend-agent should add them to
 
 | Variable         | Required | Description |
 |------------------|----------|-------------|
-| `GEMINI_API_KEY` | Yes      | Google AI Studio API key. Free tier. Obtain at https://aistudio.google.com/apikey |
-| `GEMINI_MODEL`   | No       | Gemini model ID. Defaults to `gemini-2.0-flash`. |
+| `PORT`           | No       | Port the API listens on (`server/.env.example` uses `3001`). |
+| `GEMINI_API_KEY` | Yes      | Google AI Studio API key. Free tier. Obtain at https://aistudio.google.com/apikey. Also used for receipt scanning and price estimation, not just video extraction. |
+| `GEMINI_MODEL`   | No       | Primary Gemini model ID. Defaults to `gemini-3.1-flash-lite` (`server/extract/gemini.js` `DEFAULT_MODEL`). On a 429/503 the server falls back through `gemini-3.5-flash`, `gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` (`resolveModelChain()`). |
+| `GEMINI_MODELS`  | No       | Comma-separated model IDs that replace the whole fallback chain (takes precedence over `GEMINI_MODEL`). |
 | `YTDLP_COOKIES`  | No       | Absolute path to a Netscape-format cookies file for yt-dlp. Required for private/age-gated Instagram Reels; TikTok usually works without. |
 | `GEMINI_TIMEOUT_MS` | No    | Request timeout in milliseconds for Gemini calls. Defaults to `120000` (2 minutes). |
 

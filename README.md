@@ -1,5 +1,7 @@
 # Cookbook
 
+[![tests](https://github.com/carsongranese3/cookbook/actions/workflows/tests.yml/badge.svg)](https://github.com/carsongranese3/cookbook/actions/workflows/tests.yml)
+
 A personal recipe app that turns Instagram Reels and TikTok cooking videos into structured,
 editable recipes. Paste a link (or upload the video), and Google Gemini watches it and returns a
 recipe with ingredients, steps, timings, and a cover frame, converted to imperial units.
